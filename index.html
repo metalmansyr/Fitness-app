@@ -1,0 +1,218 @@
+	Abdul's workout progress
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Khattab Strength & Recomp</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #10b981; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 15px; max-width: 600px; margin: auto; }
+        .card { background: var(--card); padding: 18px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); margin-bottom: 20px; border: 1px solid #334155; }
+        h2 { margin: 0 0 15px 0; color: var(--primary); font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
+        label { font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: bold; display: block; margin-bottom: 4px; }
+        select, input, button { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: none; font-size: 16px; box-sizing: border-box; }
+        input { background: #334155; color: white; border: 1px solid #475569; }
+        button { background: var(--primary); color: white; font-weight: bold; cursor: pointer; transition: 0.2s; border: none; }
+        button:active { transform: scale(0.98); }
+        .log-item { background: #334155; padding: 12px; margin: 8px 0; border-radius: 8px; border-left: 4px solid var(--primary); position: relative; }
+        .item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
+        .item-data { display: flex; justify-content: space-between; align-items: flex-end; }
+        .badge { background: var(--accent); color: #064e3b; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: bold; }
+        .stats { display: flex; justify-content: space-between; margin-bottom: 15px; gap: 10px; }
+        .stat-box { background: #1e293b; padding: 12px; border-radius: 8px; flex: 1; border: 1px solid var(--primary); text-align: center; }
+        .action-btns { display: flex; gap: 10px; margin-top: 5px; }
+        .edit-btn { background: #64748b; font-size: 12px; padding: 5px 10px; border-radius: 4px; color: white; cursor: pointer; }
+        .del-btn { background: #ef4444; font-size: 12px; padding: 5px 10px; border-radius: 4px; color: white; cursor: pointer; }
+        small { color: #94a3b8; }
+        /* Simple Chart CSS */
+        .chart-container { display: flex; align-items: flex-end; height: 100px; gap: 8px; margin-top: 15px; border-bottom: 2px solid #475569; padding-bottom: 5px; }
+        .bar { background: var(--primary); flex: 1; border-radius: 4px 4px 0 0; min-height: 5px; transition: height 0.5s ease; position: relative; }
+        .bar:hover::after { content: attr(data-vol); position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; background: #000; padding: 2px; }
+    </style>
+</head>
+<body>
+
+    <div class="stats">
+        <div class="stat-box">
+            <small>EST. CALORIES</small>
+            <div id="total-cals" style="font-size: 1.2rem; font-weight: bold; color: var(--accent);">0</div>
+        </div>
+        <div class="stat-box">
+            <small>TODAY'S SETS</small>
+            <div id="total-sets" style="font-size: 1.2rem; font-weight: bold; color: var(--primary);">0</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Volume Trend (Last 7 Days)</h2>
+        <div id="volume-chart" class="chart-container"></div>
+        <div style="display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; margin-top: 5px;">
+            <span>Oldest</span><span>Newest</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 id="form-title">Log Your Lift</h2>
+        <input type="hidden" id="edit-index" value="-1">
+        
+        <label>Date</label>
+        <input type="date" id="work-date">
+
+        <label>Location</label>
+        <select id="location" onchange="updateExercises()">
+            <option value="Home">🏠 Home Gym</option>
+            <option value="Office">🏢 Office Gym</option>
+        </select>
+
+        <label>Exercise</label>
+        <select id="exercise"></select>
+
+        <div style="display: flex; gap: 8px;">
+            <div style="flex: 1;"><label>Weight (lbs)</label><input type="number" id="weight"></div>
+            <div style="flex: 1;"><label>Reps</label><input type="number" id="reps"></div>
+            <div style="flex: 1;"><label>Sets</label><input type="number" id="sets"></div>
+        </div>
+        
+        <button id="save-btn" onclick="saveLog()">Save Entry</button>
+        <button id="cancel-btn" onclick="resetForm()" style="background: #475569; display: none; margin-top: -8px;">Cancel Edit</button>
+    </div>
+
+    <div class="card">
+        <h2>History</h2>
+        <div id="history"></div>
+        <button onclick="clearLogs()" style="background: transparent; color: #ef4444; font-size: 0.7rem; border: 1px solid #ef4444; margin-top: 20px;">Wipe All Data</button>
+    </div>
+
+    <script>
+        const exercises = {
+            Home: ["BB Bench Press", "Incline DB Press", "Hex Bar Deadlift", "BB Squat", "BB Row", "Overhead Press", "EZ Bar Curl", "DB Single Arm Row", "DB Romanian DL", "DB Lateral Raise", "Push-ups", "Hammer Curls", "Walking Lunges"],
+            Office: ["Cable Chest Press", "DB Flat Press (50s)", "Lat Pull Down (Wide)", "Underhand Lat Pull Down", "Seated Cable Row", "Leg Press", "Leg Extension", "Cable Lateral Raise", "Cable Shoulder Press", "Cable Tricep Pushdown", "Cable Overhead Extension", "Cable Bicep Curl", "Hammer Curls", "Face Pulls", "DB Goblet Squat (50s)", "Push-up Finisher"]
+        };
+
+        document.getElementById('work-date').valueAsDate = new Date();
+
+        function updateExercises() {
+            const loc = document.getElementById('location').value;
+            const select = document.getElementById('exercise');
+            select.innerHTML = exercises[loc].map(ex => `<option value="${ex}">${ex}</option>`).join('');
+        }
+
+        function saveLog() {
+            const date = document.getElementById('work-date').value;
+            const w = document.getElementById('weight').value || 0;
+            const r = document.getElementById('reps').value || 0;
+            const s = document.getElementById('sets').value || 0;
+            const editIndex = parseInt(document.getElementById('edit-index').value);
+
+            if(!r || !s || !date) return alert("Missing Data!");
+
+            const log = {
+                date: date,
+                location: document.getElementById('location').value,
+                exercise: document.getElementById('exercise').value,
+                weight: parseInt(w),
+                reps: parseInt(r),
+                sets: parseInt(s),
+                volume: w * r * s
+            };
+
+            const history = JSON.parse(localStorage.getItem('gymLogs') || '[]');
+            if (editIndex > -1) { history[editIndex] = log; } 
+            else { history.unshift(log); }
+
+            localStorage.setItem('gymLogs', JSON.stringify(history));
+            resetForm();
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const history = JSON.parse(localStorage.getItem('gymLogs') || '[]');
+            const container = document.getElementById('history');
+            const today = new Date().toISOString().split('T')[0];
+            
+            let totalSets = 0;
+            container.innerHTML = history.map((item, index) => {
+                if(item.date === today) totalSets += parseInt(item.sets);
+                return `
+                <div class="log-item">
+                    <div class="item-header">
+                        <span><strong>${item.exercise}</strong><br><small>${item.date}</small></span>
+                        <div class="action-btns">
+                            <span class="edit-btn" onclick="editEntry(${index})">Edit</span>
+                            <span class="del-btn" onclick="deleteEntry(${index})">X</span>
+                        </div>
+                    </div>
+                    <div class="item-data">
+                        <span style="font-size: 1.1rem; font-weight: bold;">${item.weight} <small>lbs</small> x ${item.reps} x ${item.sets}</span>
+                        <span class="badge">VOL: ${item.volume.toLocaleString()}</span>
+                    </div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('total-sets').innerText = totalSets;
+            document.getElementById('total-cals').innerText = (totalSets * 22) + 100;
+            updateChart(history);
+        }
+
+        function updateChart(history) {
+            const chart = document.getElementById('volume-chart');
+            const dailyVolume = {};
+            
+            history.forEach(item => {
+                dailyVolume[item.date] = (dailyVolume[item.date] || 0) + item.volume;
+            });
+
+            const sortedDates = Object.keys(dailyVolume).sort().slice(-7);
+            const maxVol = Math.max(...Object.values(dailyVolume), 1);
+
+            chart.innerHTML = sortedDates.map(date => {
+                const height = (dailyVolume[date] / maxVol) * 100;
+                return `<div class="bar" style="height: ${height}%" data-vol="${dailyVolume[date]}"></div>`;
+            }).join('');
+        }
+
+        function editEntry(index) {
+            const history = JSON.parse(localStorage.getItem('gymLogs'));
+            const item = history[index];
+            document.getElementById('form-title').innerText = "Edit Entry";
+            document.getElementById('edit-index').value = index;
+            document.getElementById('work-date').value = item.date;
+            document.getElementById('location').value = item.location;
+            updateExercises();
+            document.getElementById('exercise').value = item.exercise;
+            document.getElementById('weight').value = item.weight;
+            document.getElementById('reps').value = item.reps;
+            document.getElementById('sets').value = item.sets;
+            document.getElementById('save-btn').innerText = "Update Entry";
+            document.getElementById('cancel-btn').style.display = "block";
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function deleteEntry(index) {
+            if(confirm("Delete?")) {
+                const history = JSON.parse(localStorage.getItem('gymLogs'));
+                history.splice(index, 1);
+                localStorage.setItem('gymLogs', JSON.stringify(history));
+                renderHistory();
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('form-title').innerText = "Log Your Lift";
+            document.getElementById('edit-index').value = "-1";
+            document.getElementById('save-btn').innerText = "Save Entry";
+            document.getElementById('cancel-btn').style.display = "none";
+            document.getElementById('weight').value = "";
+            document.getElementById('reps').value = "";
+            document.getElementById('sets').value = "";
+        }
+
+        function clearLogs() { if(confirm("Wipe data?")) { localStorage.removeItem('gymLogs'); renderHistory(); } }
+
+        updateExercises();
+        renderHistory();
+    </script>
+</body>
+</html>
